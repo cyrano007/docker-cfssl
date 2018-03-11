@@ -1,11 +1,22 @@
-FROM cfssl/cfssl:latest
+FROM gliderlabs/alpine:latest
 
-RUN cfssl print-defaults config > ca-config.json \
-&& cfssl print-defaults csr > ca-csr.json \  
-&& cfssl genkey -initca ca-csr.json | cfssljson -bare ca
+MAINTAINER Pustefix "<cyrano007@byom.de>"
 
+# Try hard to get a minimal image to reduce footprint
+RUN apk update && \
+    apk add go git gcc libc-dev libltdl libtool libgcc && \
+    export GOPATH=/go && \
+    go get -u github.com/cloudflare/cfssl/cmd/... && \
+    apk del go git gcc libc-dev libtool libgcc && \
+    mv /go/bin/* /bin/ && \
+    rm -rf /go/src/golang.org && \
+    rm -rf /go/src/github.com/GeertJohan && \
+    rm -rf /go/src/github.com/daaku && \
+    rm -rf /go/src/github.com/dgryski && \
+    rm -rf /go/src/github.com/kardianos && \
+    rm -rf /go/src/github.com/miekg
+
+VOLUME [ "/etc/cfssl" ]
+WORKDIR /etc/cfssl
 EXPOSE 8888
-
-ENTRYPOINT ["cfssl"]
-
-CMD ["serve","-ca=ca.pem","-ca-key=ca-key.pem","-address=0.0.0.0"]  
+ENTRYPOINT ["/bin/cfssl"]
