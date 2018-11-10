@@ -1,11 +1,11 @@
 #! /usr/bin/env bash
 set -x
 ### Create the CA Key and Certificate for signing Client Certs
-# openssl genrsa -des3 -out ca-key.key 4096
-# openssl req -new -x509 -days 365 -key ca-key.key -out ca.pem
+openssl genrsa -des3 -out ca-key.key 4096
+openssl req -new -x509 -days 365 -key ca-key.key -out ca.pem
 
 ### Delete passphrate from key
-# openssl rsa -in ca-key.key -out ca-key.pem
+openssl rsa -in ca-key.key -out ca-key.pem
 
 #########################################################################################################
 ################################### Build dockerfile    #################################################
