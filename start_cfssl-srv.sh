@@ -1,16 +1,69 @@
-docker build -t cfssltest .
-docker run -d -p 8888:8888 cfssltest
+#! /usr/bin/env bash
+set -x
+### Create the CA Key and Certificate for signing Client Certs
+# openssl genrsa -des3 -out ca-key.key 4096
+# openssl req -new -x509 -days 365 -key ca-key.key -out ca.pem
+
+### Delete passphrate from key
+# openssl rsa -in ca-key.key -out ca-key.pem
+
+#########################################################################################################
+################################### Build dockerfile    #################################################
+#########################################################################################################
+
+cat <<EOF > dockerfile
+FROM cfssl/cfssl:latest
+
+ADD ca.pem /etc/cfssl/ca.pem
+ADD ca-key.pem /etc/cfssl/ca-key.pem
+
+EXPOSE 8888
+
+ENTRYPOINT ["cfssl"]
+
+CMD ["serve","-ca=/etc/cfssl/ca.pem","-ca-key=/etc/cfssl/ca-key.pem","-address=0.0.0.0"]
+
+EOF
+
+#########################################################################################################
+################################### Build Dockerimage   #################################################
+#########################################################################################################
+
+docker build -t cfssl-ca .
+sleep 5
+#########################################################################################################
+################################### running Dockerimage   #################################################
+#########################################################################################################
+
+docker run -d -p 8888:8888 cfssl-ca
+sleep 5
+#########################################################################################################
+################################### generate certificate  ###############################################
+#########################################################################################################
 
 
+cat <<EOF > gencert.sh
+#!/bin/bash
+set -x
+certname=test.server.org
+caaddress='192.168.192.244'
 
-# RUN cfssl print-defaults config > ca-config.json \
-# && cfssl print-defaults csr > ca-csr.json \
-# && cfssl genkey -initca ca-csr.json | cfssljson -bare ca
-#
+# Generate Certificate
+curl -d '{ "request": {"CN": '\"\$certname\"',"hosts":['\"\$certname\"'], "key": { "algo": "rsa","size": 2048 }, "names": [{"C":"DE","ST":"Hessen", "L":"Wiesbaden","O":"poolix.org"}] }}' http://localhost:8888/api/v1/cfssl/newcert > tmpcert.json
 
 
-# CMD ["serve","-ca=ca.pem","-ca-key=ca-key.pem","-address=0.0.0.0"]
+# Create Private Key
+echo -e "\$(cat tmpcert.json | python -m json.tool |   grep private_key | cut -f4 -d '"')"   > ./\$certname.key
 
-curl -d '{ "request": {"hosts":["certname-test"], \
-"names":[{"C":"US", "ST":"California", "L":"San Francisco", "O":"example.com"}]} }' \
-http://localhost:8888/api/v1/cfssl/newcert
+# Create Certificate
+echo -e "\$(cat tmpcert.json | python -m json.tool |   grep -m 1 certificate | cut -f4 -d '"')"   > ./\$certname.cer
+
+# Create Certificate Request
+echo -e "\$(cat tmpcert.json | python -m json.tool |   grep certificate_request | cut -f4 -d '"')" > ./\$certname.csr
+
+# Remove JSON Data
+rm -Rf tmpcert.json  
+
+EOF
+
+bash ./gencert.sh
