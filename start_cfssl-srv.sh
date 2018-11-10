@@ -1,17 +1,23 @@
 #! /usr/bin/env bash
 set -x
+
+DOCKERFILE='dockerfile'
+CA_NAME='cfssl-ca'
+CERT_SCRIPT='testcerts.sh'
+
+
 ### Create the CA Key and Certificate for signing Client Certs
-openssl genrsa -des3 -out ca-key.key 4096
-openssl req -new -x509 -days 365 -key ca-key.key -out ca.pem
+# openssl genrsa -des3 -out ca-key.key 4096
+# openssl req -new -x509 -days 365 -key ca-key.key -out ca.pem
 
 ### Delete passphrate from key
-openssl rsa -in ca-key.key -out ca-key.pem
+# openssl rsa -in ca-key.key -out ca-key.pem
 
 #########################################################################################################
 ################################### Build dockerfile    #################################################
 #########################################################################################################
-
-cat <<EOF > dockerfile
+rm ${DOCKERFILE}
+cat <<EOF > ${DOCKERFILE}
 FROM cfssl/cfssl:latest
 
 ADD ca.pem /etc/cfssl/ca.pem
@@ -29,20 +35,20 @@ EOF
 ################################### Build Dockerimage   #################################################
 #########################################################################################################
 
-docker build -t cfssl-ca .
-sleep 5
+docker build -t ${CA_NAME} .
+
 #########################################################################################################
 ################################### running Dockerimage   #################################################
 #########################################################################################################
-
-docker run -d -p 8888:8888 cfssl-ca
+docker rm $(docker stop $(docker ps -a -q --filter ancestor=${CA_NAME} --format="{{.ID}}"))
+docker run -d -p 8888:8888 ${CA_NAME}
 sleep 5
 #########################################################################################################
 ################################### generate certificate  ###############################################
 #########################################################################################################
 
-
-cat <<EOF > gencert.sh
+rm ${CERT_SCRIPT}
+cat <<EOF > ${CERT_SCRIPT}
 #!/bin/bash
 set -x
 certname=test.server.org
@@ -66,4 +72,4 @@ rm -Rf tmpcert.json
 
 EOF
 
-bash ./gencert.sh
+bash ./${CERT_SCRIPT}
